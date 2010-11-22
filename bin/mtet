@@ -1,0 +1,99 @@
+#!/usr/bin/python
+
+# Copyright (c) 2007 John Lincoln Kenyon
+# 
+# Permission is hereby granted, free of charge, to any person
+# obtaining a copy of this software and associated documentation
+# files (the "Software"), to deal in the Software without
+# restriction, including without limitation the rights to use,
+# copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following
+# conditions:
+# 
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+# OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+# HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+# WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
+#
+
+
+import sys
+import re
+import os
+from copy import copy
+import pprint
+
+
+def lambda_reducer(values):
+    def value_reducer(match):
+        return str(eval(match.group(1),{},values))
+    return value_reducer
+
+def apply_transform(data,values):
+    return re.compile(r'<%=([^%>]*)%>').sub(lambda_reducer(values),data)
+
+def generate_file(raw_data,values):
+    result = apply_transform(template,values)
+    out_file = data_values['__pattern']%data_values
+
+def flatten(lst):
+    dest = []
+    for idx,x in enumerate(lst):
+        if type(x) is list:
+            dest.extend(flatten(x))
+        else:
+            dest.append(x)
+    return dest
+
+def expand_arrays(vals):
+    found = False
+    result = [vals]
+    for k,v in vals.iteritems():
+        if type(v) is list:
+            found = True
+            temps = [copy(vals) for x in xrange(len(v))]
+            for idx,x in enumerate(v):
+                temps[idx][k] = x
+    if found:
+        result = flatten([expand_arrays(x) for x in temps])
+    return result
+
+def main():
+    if len(sys.argv) < 3:
+        raise "Usage Error: %s <template> <data>"%sys.argv[0]
+    assert os.path.isfile(sys.argv[1]),os.path.isfile(sys.argv[1])
+
+    template_fname = sys.argv[1]
+    data_fname = sys.argv[2]
+
+    data_values = {'__template_fname':template_fname}
+    exec file(data_fname) in dict(),data_values
+
+    data_sets = expand_arrays(data_values)
+
+    template = file(template_fname).read()
+    for idx,data_values in enumerate(data_sets):
+        data_values['__idx'] = idx
+        if data_values.has_key('__pattern'):
+            out_fname = data_values['__pattern']%data_values
+        else:
+            out_fname = "%05i.out"%idx
+        result = apply_transform(template,data_values)
+        try:
+            os.makedirs(os.path.dirname(out_fname))
+        except : pass
+        fout = file(out_fname,'w')
+        fout.write(result)
+        fout.close()
+
+if __name__=='__main__':
+    main()
+

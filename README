@@ -1,0 +1,166 @@
+The Meta-Template Engine (Transform) is a simple tool for generating local files based on a simple template. The design borrows greatly from PSP/ERB, but has a different intention MTET is not meant for interfacing with the web at all. Instead, its original purpose was for creating large batches of simulation description files. As always, this is most clearly described graphically.
+
+In the simplest case, a simulation will only need to be run once, with one set of input parameters.
+
++----------------+    +-----------+
+| Run Parameters | -> | Simulator |
++----------------+    +-----------+
+
+However, usually you need to tune or modify many parameters over the course of your work. You may even need to run hundreds of different simulations. In some cases, the differences may be as simple as using a different hard-coded seed for each different run. In this case, it would be horribly tedious for a user to manually edit several hundred files to simply make them each use sequential random seeds.
+
+
++----------------+
+| Run Parameters | \
++----------------+  \
+                     \
++----------------+    \  +-----------+
+| Run Parameters | ----> | Simulator |
++----------------+    /  +-----------+
+                     /
++----------------+  /
+| Run Parameters | /
++----------------+
+
+This is where MTET can help out. The user will create one template for the input file, using the ERB/PSP style eval tags for variable portions of the file: <%= ... >. The user then creates a separate file which simply assigns values or lists of python values to variable names which will be common between template and the data rules. These two files are fed into the MTET application, which will produce all possible combinations of the variables listed.
+
+
+
+   +------------------------+
+   | Generic run parameters |
+   | and data               |
+   +------------------------+
+         |
+         v
+      _______
+      \     /       +--------------------------+
+       \   /   <--  | Template values and data |
+        \ /         +--------------------------+
+         |
+         v
++----------------+
+| Run Parameters | \
++----------------+  \
+                     \
++----------------+    \  +-----------+
+| Run Parameters | ----> | Simulator |
++----------------+    /  +-----------+
+                     /
++----------------+  /
+| Run Parameters | /
++----------------+
+
+
+
+Simple Examples, Single variable
+
+In the simplest case, we will create a trivial template with a single variable.
+
+rules01.txt :
+
+value=10
+template01.txt :
+
+The value is <%= value %>
+Run:
+
+jkenyon@prometheus:~/temp$ mtet template01.txt rules01.txt
+jkenyon@prometheus:~/temp$ ls'
+00000.out  rules01.txt  template01.txt
+jkenyon@prometheus:~/temp$ cat 00000.out 
+The value is 10
+jkenyon@prometheus:~/temp$
+Single varible spanning several values
+
+rules02.txt :
+
+value=[3,4,5]
+template02.txt :
+
+The value is <%= value %>
+Run :
+
+jkenyon@prometheus:~/temp$ ls *.out
+00000.out  00001.out  00002.out
+jkenyon@prometheus:~/temp$ cat 00000.out 
+The value is 3
+jkenyon@prometheus:~/temp$ cat 00001.out 
+The value is 4
+jkenyon@prometheus:~/temp$ cat 00002.out 
+The value is 5
+
+Now we can see a slightly useful example. By simply using the Python list format, we can get multiple output files, each with a different value for the given variable.
+
+Complex example
+
+template03.txt :
+
+The value is <%= a %>
+The other value is <%= b %>
+The final value is <%= c %>
+rules03.txt :
+
+a = range(3,6)
+b = [x*x for x in (3,4,5)]
+c = ['one','two','three']
+__pattern = "set_%(a)s/square_%(b)s/run_%(c)s.txt"
+Now we are going for the advanced method. We can over-write the boring serial integer naming scheme by defining the __pattern value. It may even define large nested directory structures, which will automatically be created by MTET. It will also give a more meaningful name to the output file. If we wish to use the serial number in addition to other information, we can use %(__idx)s as well. Look up the Python String Modulus operator with regard to dictionaries for more information.
+
+We also see in this example, that we have 3 other variables which we are making use of. Each of these will be expanded to produce all possible combinations of the different variables.
+
+jkenyon@prometheus:~/temp$ ls -dF set*
+set_3/  set_4/  set_5/
+As we can see, it auto-generated three directories in accordance with our file naming pattern. We can use "find" to get a better idea of the final output.
+
+
+jkenyon@prometheus:~/temp$ find .
+...
+./template03.txt
+./rules03.txt
+./set_3
+./set_3/square_9
+./set_3/square_9/run_one.txt
+./set_3/square_9/run_two.txt
+./set_3/square_9/run_three.txt
+./set_3/square_16
+./set_3/square_16/run_one.txt
+./set_3/square_16/run_two.txt
+./set_3/square_16/run_three.txt
+./set_3/square_25
+./set_3/square_25/run_one.txt
+./set_3/square_25/run_two.txt
+./set_3/square_25/run_three.txt
+./set_4
+./set_4/square_9
+./set_4/square_9/run_one.txt
+./set_4/square_9/run_two.txt
+./set_4/square_9/run_three.txt
+./set_4/square_16
+./set_4/square_16/run_one.txt
+./set_4/square_16/run_two.txt
+./set_4/square_16/run_three.txt
+./set_4/square_25
+./set_4/square_25/run_one.txt
+./set_4/square_25/run_two.txt
+./set_4/square_25/run_three.txt
+./set_5
+./set_5/square_9
+./set_5/square_9/run_one.txt
+./set_5/square_9/run_two.txt
+./set_5/square_9/run_three.txt
+./set_5/square_16
+./set_5/square_16/run_one.txt
+./set_5/square_16/run_two.txt
+./set_5/square_16/run_three.txt
+./set_5/square_25
+./set_5/square_25/run_one.txt
+./set_5/square_25/run_two.txt
+./set_5/square_25/run_three.txt
+And if we pick one of these files to inspect, like ./set_5/square_25/run_three.txt, we get the following:
+
+jkenyon@prometheus:~/temp$ cat ./set_5/square_25/run_three.txt
+The value is 5
+The other value is 25
+The final value is 'three'
+
+As a final note, any strings specified will be put in repr format, which will make YAML much happier, but will make XML unhappy. Viva YAML!
+

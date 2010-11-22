@@ -1,0 +1,3 @@
+The value is <%= a %>
+The other value is <%= b %>
+The final value is <%= c %>
